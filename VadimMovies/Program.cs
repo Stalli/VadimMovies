@@ -7,8 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 var corsPolicyName = "MoviesOriginPolicy";
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
-builder.Services.AddDbContext<MovieDb>(opt => opt.UseSqlServer(builder.Configuration.GetConnectionString("Azure")));
+builder.Services.AddDbContext<MovieDb>(opt => opt.UseSqlServer(GetDbConnectionString(builder.Configuration, "Azure")));
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(name: corsPolicyName,
@@ -39,7 +38,7 @@ async Task<List<MovieDto>> SearchMovie(MovieDb db, string movieTitle)
     var result = new List<MovieDto>();
     var movies = await db.Movies.Where(m => m.Title == movieTitle).ToListAsync();
     
-    var share = new ShareClient(builder.Configuration.GetConnectionString("AzureFileShare"), "vadimmoviewfileshare");
+    var share = new ShareClient(GetDbConnectionString(builder.Configuration, "AzureFileShare"), "vadimmoviewfileshare");
     var directory = share.GetDirectoryClient("");
     foreach (var movie in movies)
     {
@@ -59,4 +58,17 @@ async Task<List<MovieDto>> SearchMovie(MovieDb db, string movieTitle)
     }
     
     return result;
+}
+
+string GetDbConnectionString(ConfigurationManager configManager, string alias)
+{
+    var environmentalVariable = Environment.GetEnvironmentVariable($"CUSTOMCONNSTR_{alias}");
+    if (environmentalVariable != null)
+        return environmentalVariable;
+    
+    var conStringFromFile = configManager.GetConnectionString(alias);
+    if (conStringFromFile == null)
+        throw new Exception($"No connection string found for alias {alias}");
+    
+    return conStringFromFile;
 }
